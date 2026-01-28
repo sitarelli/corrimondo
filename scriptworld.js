@@ -65,6 +65,9 @@ const worldCapitals = [
 /* --- RISORSE AUDIO --- */
 const soundSbanda = new Audio('sbanda.mp3');
 const soundAccelera = new Audio('accelera.mp3');
+const bgMusic = new Audio('musica.mp3');
+bgMusic.loop = true; 
+bgMusic.volume = 0.4; // Volume al 40%
 soundSbanda.volume = 0.5;
 soundAccelera.volume = 0.5;
 
@@ -139,6 +142,34 @@ const lastErrorDisplay = document.getElementById('last-error-display');
 const didYouKnowText = document.getElementById('did-you-know-text');
 
 function init() {
+// --- STILE FARI ---
+    const hlStyle = document.createElement('style');
+    hlStyle.innerHTML = `
+        .headlights-on { box-shadow: 0 -10px 30px rgba(255, 255, 200, 0.5); }
+        .headlights-on::after {
+            content: ''; position: absolute; bottom: 80%; left: -20%; width: 140%; height: 250px;
+            background: linear-gradient(to top, rgba(255, 255, 220, 0.3) 0%, transparent 100%);
+            clip-path: polygon(20% 100%, 80% 100%, 100% 0%, 0% 0%); pointer-events: none; z-index: 100;
+        }
+    `;
+    document.head.appendChild(hlStyle);
+
+// --- CREAZIONE VELO NOTTE (LAYER) ---
+    // Copre tutto (z-index 1), ma lascia sopra Macchina (z-50) e Cartelli (z-dinamico)
+    const veil = document.createElement('div');
+    veil.id = 'night-veil';
+    veil.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:black; opacity:0; pointer-events:none; z-index: 1; transition: opacity 1s linear;';
+    document.body.appendChild(veil);
+
+
+// --- IL SOLE (Elemento Grafico) ---
+    const sun = document.createElement('div');
+    sun.id = 'the-sun';
+    // Stile: Rotondo, Giallo sfumato, Luminoso (box-shadow)
+    sun.style.cssText = 'position:absolute; top:15%; left:50%; transform:translate(-50%, -50%); width:120px; height:120px; background:radial-gradient(circle, #fff 10%, #ffeb3b 60%, transparent 100%); border-radius:50%; box-shadow: 0 0 60px rgba(255, 235, 59, 0.8); z-index: 0; transition: top 1.5s ease-in-out, opacity 1.5s; opacity: 1; pointer-events:none;';
+    // Lo mettiamo come PRIMO elemento del viewport così sta dietro a tutto
+    gameViewport.insertBefore(sun, gameViewport.firstChild);
+
     document.addEventListener('keydown', handleInput);
     gameViewport.addEventListener('mousedown', e => {
         if (!state.isPlaying) return;
@@ -192,6 +223,8 @@ function init() {
             muteBtn.innerText = state.isMuted ? '🔇' : '🔊';
             soundSbanda.muted = state.isMuted;
             soundAccelera.muted = state.isMuted;
+bgMusic.muted = state.isMuted;
+            if (!state.isMuted && state.isPlaying) bgMusic.play().catch(e => {});
             muteBtn.blur();
         });
     }
@@ -218,9 +251,12 @@ function moveRight() { if (state.currentLane < 2) { state.currentLane++; updateP
 function updatePlayerPosition() {
     playerEl.className = '';
     playerEl.classList.add('lane-' + state.currentLane);
+    
     if(state.isTurbo) playerEl.classList.add('turbo-active');
+    
+    // FIX FARI: Se è notte, riapplica i fari anche quando sterzi
+    if(state.isNight) playerEl.classList.add('headlights-on');
 }
-
 function updateScore() { scoreEl.innerText = 'PUNTI: ' + state.score; }
 function updateLives() { livesEl.innerText = '❤️'.repeat(state.lives); }
 
@@ -257,7 +293,11 @@ function initRoad() {
 
 function startGame() {
     if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
-    state.isPlaying = true; state.score = 0; state.lives = 3; state.isTurbo = false;
+    state.isPlaying = true; 
+bgMusic.currentTime = 0;
+    if (!state.isMuted) bgMusic.play().catch(e => {});
+
+state.score = 0; state.lives = 3; state.isTurbo = false;
     state.gates = []; state.currentLane = 1; state.lastTime = performance.now();
     
     // QUI USIAMO worldCapitals
@@ -278,6 +318,7 @@ function startNextRound() {
     targetDisplay.innerText = state.currentTarget.città;
     targetDisplay.classList.add('visible');
     spawnGates();
+    updateDayNightCycle();
     state.waveActive = true; state.isTurbo = false;
     playerEl.classList.remove('turbo-active');
 }
@@ -385,14 +426,18 @@ function createSmoke() {
 }
 
 function showWinScreen() {
-    state.isPlaying = false; cancelAnimationFrame(state.animationFrameId);
+    state.isPlaying = false; 
+bgMusic.pause();
+cancelAnimationFrame(state.animationFrameId);
     targetDisplay.classList.remove('visible');
     const win = document.getElementById('overlay-win');
     if (win) win.classList.remove('hidden'); else alert("HAI VINTO!");
 }
 
 function gameOver(wrong) {
-    state.isPlaying = false; cancelAnimationFrame(state.animationFrameId);
+    state.isPlaying = false; 
+bgMusic.pause();
+cancelAnimationFrame(state.animationFrameId);
     targetDisplay.classList.remove('visible');
     lastErrorDisplay.innerHTML = `Hai scelto <b>${wrong}</b>.<br>Era <b>${state.currentTarget.regione}</b>.`;
     if(state.currentTarget.curiosità) didYouKnowText.textContent = state.currentTarget.curiosità;
@@ -416,6 +461,42 @@ function getFlagFilename(regionName) {
     // Pulisce il nome per farlo coincidere con i file (es: "Stati Uniti" -> "stati_uniti.png")
     let cleanName = regionName.replace(/^[^\wÀ-ÿ]+/, "").trim(); 
     return cleanName.toLowerCase().replace(/ /g, "_").replace(/'/g, "") + ".png";
+
 }
 
+
+// --- LOGICA GIORNO/NOTTE (LAYER) ---
+// --- LOGICA GIORNO/NOTTE (LAYER) ---
+function updateDayNightCycle() {
+    const total = worldCapitals.length; // 50
+    const done = total - state.cityQueue.length; 
+    
+    // Centro della notte: città 25.
+    // Range luci richieste: dalla 15 alla 35 (cioè +/- 10 città dal centro).
+    const dist = Math.abs(done - 25); 
+    
+    // Darkness: max 0.85 (notte) scende a 0 (giorno).
+    // Divisore 18 rende la notte un po' più "stretta" concentrandola al centro.
+    let darkness = 0.85 - (dist / 18); 
+    if (darkness < 0) darkness = 0; 
+    
+    // 1. Applica il velo scuro
+    const veil = document.getElementById('night-veil');
+    if (veil) veil.style.opacity = darkness;
+
+    // 2. Muovi il Sole
+    const sun = document.getElementById('the-sun');
+    if (sun) {
+        const sunPos = 10 + (darkness * 27); // 60 = movimento moderato
+        sun.style.top = `${sunPos}%`;
+        sun.style.opacity = (darkness > 0.6) ? 0 : 1;
+    }
+
+    // 3. Fari Auto: Salviamo lo stato in una variabile globale
+    // Si accendono se darkness > 0.3 (circa tra città 15 e 35)
+    state.isNight = (darkness > 0.3);
+    
+    if (state.isNight) playerEl.classList.add('headlights-on');
+    else playerEl.classList.remove('headlights-on');
+}
 init();
