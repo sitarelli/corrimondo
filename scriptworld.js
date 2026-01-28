@@ -145,11 +145,13 @@ function init() {
 // --- STILE FARI ---
     const hlStyle = document.createElement('style');
     hlStyle.innerHTML = `
-        .headlights-on { box-shadow: 0 -10px 30px rgba(255, 255, 200, 0.5); }
-        .headlights-on::after {
-            content: ''; position: absolute; bottom: 80%; left: -20%; width: 140%; height: 250px;
-            background: linear-gradient(to top, rgba(255, 255, 220, 0.3) 0%, transparent 100%);
-            clip-path: polygon(20% 100%, 80% 100%, 100% 0%, 0% 0%); pointer-events: none; z-index: 100;
+  
+.headlights-on::after {
+            content: ''; position: absolute; bottom: 80%; left: -50%; width: 200%; height: 450px;
+            background: linear-gradient(to top, rgba(255, 255, 220, 0.4) 0%, transparent 100%);
+            /* Apertura ridotta: base 46-54%, orizzonte 25-75% (invece di 0-100%) */
+            clip-path: polygon(46% 100%, 54% 100%, 75% 0%, 25% 0%); 
+            pointer-events: none; z-index: 100;
         }
     `;
     document.head.appendChild(hlStyle);
@@ -444,7 +446,28 @@ cancelAnimationFrame(state.animationFrameId);
     overlayOver.classList.remove('hidden');
 }
 
-function resetToStart() { overlayOver.classList.add('hidden'); overlayStart.classList.remove('hidden'); entitiesContainer.innerHTML = ''; }
+
+function resetToStart() { 
+    // 1. Nasconde tutti gli overlay
+    overlayOver.classList.add('hidden'); 
+    overlayStart.classList.remove('hidden'); 
+    const win = document.getElementById('overlay-win');
+    if (win) win.classList.add('hidden');
+
+    // 2. Pulisce i portali rimasti
+    entitiesContainer.innerHTML = ''; 
+    state.gates = [];
+
+    // 3. Reset grafico immediato (Giorno e Sole)
+    const veil = document.getElementById('night-veil');
+    if (veil) veil.style.opacity = '0';
+    const sun = document.getElementById('the-sun');
+    if (sun) { 
+        sun.style.top = '15%'; 
+        sun.style.opacity = '1'; 
+    }
+}
+
 
 function showErrorPopup(correct) {
     const pop = document.getElementById('feedback-pop');
