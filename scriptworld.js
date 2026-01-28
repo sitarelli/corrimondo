@@ -294,6 +294,18 @@ function spawnGates() {
     opts.forEach((text, index) => {
         const gate = document.createElement('div');
         gate.classList.add('gate');
+
+// --- INIZIO MODIFICA GRAFICA ---
+        const filename = getFlagFilename(text);
+        gate.style.backgroundImage = `url('img/flags/${filename}')`;
+        gate.style.backgroundSize = 'cover';
+        gate.style.backgroundPosition = 'center';
+        gate.style.border = '2px solid white';     // Bordo bianco per stacco
+        gate.style.color = 'white';                // Testo bianco
+        gate.style.textShadow = '2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000'; // Contorno nero al testo
+        gate.style.fontWeight = 'bold';
+        // --- FINE MODIFICA GRAFICA ---
+
         gate.innerText = text;
         entitiesContainer.appendChild(gate);
         state.gates.push({ 
@@ -396,6 +408,14 @@ function showErrorPopup(correct) {
     pop.classList.remove('hidden');
     setTimeout(() => pop.classList.add('visible'), 10);
     setTimeout(() => { pop.classList.remove('visible'); setTimeout(() => pop.classList.add('hidden'), 300); }, 2500);
+}
+
+
+// --- NUOVA FUNZIONE PER I NOMI FILE ---
+function getFlagFilename(regionName) {
+    // Pulisce il nome per farlo coincidere con i file (es: "Stati Uniti" -> "stati_uniti.png")
+    let cleanName = regionName.replace(/^[^\wÀ-ÿ]+/, "").trim(); 
+    return cleanName.toLowerCase().replace(/ /g, "_").replace(/'/g, "") + ".png";
 }
 
 init();
