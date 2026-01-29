@@ -293,8 +293,21 @@ function initRoad() {
     });
 }
 
+
 function startGame() {
-    if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+    // --- MODIFICA PER FULLSCREEN iOS/SAFARI ---
+    let doc = document.documentElement;
+    if (doc.requestFullscreen) {
+        doc.requestFullscreen().catch(() => {});
+    } else if (doc.webkitRequestFullscreen) { 
+        /* Questo è il comando specifico per iPhone/Safari */
+        doc.webkitRequestFullscreen();
+    }
+    // ------------------------------------------
+
+    state.isPlaying = true; 
+    state.score = 0; 
+    // ... resto del codice invariato
     state.isPlaying = true; 
 bgMusic.currentTime = 0;
     if (!state.isMuted) bgMusic.play().catch(e => {});
